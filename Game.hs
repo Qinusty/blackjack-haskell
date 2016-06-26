@@ -53,18 +53,18 @@ userTurn state@(deck, uHand, dHand) = do
     putStrLn "\nYour current hand is:"
     printHand uHand
     putStrLn "\nWould you like to hit, stay? (enter h or s)"
-    choice <- getChar
+    choice <- getLine
     performAction choice
     where
-        performAction choice
-            | choice == 'h' = do
+        performAction (c:cs)
+            | c == 'h' = do
                 let 
                     (card, nDeck) = drawCard deck
                     newUHand = card : uHand
                 putStr "\nYou drew: "
                 print card
                 userTurn (nDeck, newUHand, dHand)
-            | choice == 's' = return state
+            | c == 's' = return state
             | otherwise     = do 
                 putStrLn "Invalid choice! Try again"
                 userTurn state
