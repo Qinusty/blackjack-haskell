@@ -41,26 +41,17 @@ printHand hand = putStrLn $ (++ ("\nWith a value of " ++ show (valueOfHand hand)
 valueOfHand :: Hand -> (Int, Int)
 valueOfHand = foldr ((\(a,b) (c,d) -> (a+c, b+d)) . valueOfCard) (0,0)
 
--- NEEDS SIMPLIFYING 
 valueOfCard :: Card -> (Int, Int)
 valueOfCard (Card _ Ace)   = (1, 11)
-valueOfCard (Card _ Two)   = (2, 2)
-valueOfCard (Card _ Three) = (3, 3)
-valueOfCard (Card _ Four)  = (4, 4)
-valueOfCard (Card _ Five)  = (5, 5)
-valueOfCard (Card _ Six)   = (6, 6)
-valueOfCard (Card _ Seven) = (7, 7)
-valueOfCard (Card _ Eight) = (8, 8)
-valueOfCard (Card _ Nine)  = (9, 9)
-valueOfCard (Card _ Ten)   = (10,10)
 valueOfCard (Card _ Jack)  = (10,10)
 valueOfCard (Card _ Queen) = (10,10)
 valueOfCard (Card _ King)  = (10,10)
 valueOfCard Joker          = (0,0)
+valueOfCard (Card _ n)     = (k+1, k+1) where k = fromEnum n
 
 drawCard :: Deck -> (Card, Deck)
-drawCard [] = error "Empty Deck"
-drawCard (c:cs) = (c, cs)
+drawCard [] = error "Game over, Somehow your deck is out of cards."
+drawCard (c:cs) = Just (c, cs)
 
 shuffleDeck :: MonadRandom m => Deck -> m Deck
 shuffleDeck deck = runRVar (shuffle deck) StdRandom
