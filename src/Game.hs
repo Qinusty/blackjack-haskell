@@ -5,16 +5,17 @@ import Cards
 -- A game state holds information regarding the current state of the game.
 -- The first value is the game deck [Card]
 -- The second value is the Users hand [Card]
--- The final value is the dealers hand [Card]
-type GameState = (Deck, Deck, Deck)
+-- The third value is the dealers hand [Card]
+-- The final value represents USER BUST?
+type GameState = (Deck, Deck, Deck, Bool)
 
 main :: IO ()
 main = do
     deck <- shuffleDeck newDeck
-    playGame (deck, [], [])
+    playGame (deck, [], [], False)
 
 playGame :: GameState -> IO ()
-playGame state@(deck, uHand, dHand)
+playGame state@(deck, uHand, dHand, _)
     | null uHand && null dHand = do -- INIT CASE
         putStrLn "You draw:"
         let (fCard, nDeck) = drawCard deck
@@ -28,7 +29,7 @@ playGame state@(deck, uHand, dHand)
         putStrLn "\nThe dealer drew: "
         print dCard
 
-        playGame (nDeck'', newUHand, newDHand)
+        playGame (nDeck'', newUHand, newDHand, False)
 
     | otherwise = do -- Main Game
         newState  <- userTurn state
@@ -36,7 +37,7 @@ playGame state@(deck, uHand, dHand)
         endGame state
 
 endGame :: GameState -> IO ()
-endGame (_, uHand, dHand) = do
+endGame (_, uHand, dHand, _) = do
     putStr "\nYour hand: "
     printHand uHand
     putStr "\nDealer hand: "
@@ -48,7 +49,7 @@ endGame (_, uHand, dHand) = do
             | otherwise                     = "You lose, Better luck next time :("
 
 userTurn :: GameState -> IO GameState
-userTurn state@(deck, uHand, dHand) = do 
+userTurn state@(deck, uHand, dHand, _) = do 
     putStrLn "\nYour current hand is:"
     printHand uHand
     putStrLn "\nWould you like to hit, stay? (enter h or s)"
@@ -61,18 +62,23 @@ userTurn state@(deck, uHand, dHand) = do
                     newUHand = card : uHand
                 putStr "\nYou drew: "
                 print card
-                userTurn (nDeck, newUHand, dHand)
+                if (minimum $ valueOfHand newUHand) <= 21 then
+                    userTurn (nDeck, newUHand, dHand, False)
+                else do
+                    putStrLn "BUST!"
+                    return (nDeck, newUHand, dHand, True)
             | c == 's' = return state
             | otherwise     = do 
                 putStrLn "Invalid choice! Try again"
                 userTurn state
 
 dealerTurn :: GameState -> IO GameState
-dealerTurn state@(deck, uHand, dHand) 
-    | fst (valueOfHand dHand) <= 16 || snd (valueOfHand dHand) <= 16 = do
+dealerTurn state@(deck, uHand, dHand, userBust) 
+    | userBust                          = return state
+    | minimum (valueOfHand dHand) <= 16 = do
         let (card, nDeck) = drawCard deck
             newDHand = card : dHand
         putStr "\nDealer draws: "
         print card
-        dealerTurn (nDeck, uHand, newDHand)
+        dealerTurn (nDeck, uHand, newDHand, False)
     | otherwise = return state

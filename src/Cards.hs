@@ -25,33 +25,30 @@ compareHand hand1 hand2
     where 
         values1 = valueOfHand hand1
         values2 = valueOfHand hand2
-        highestValid (a,b)
-            | (a >= b) && a <= 21 = a
-            | (b >= a) && b <= 21 = b
-            | otherwise           = -1
+        highestValid :: [Int] -> Int
+        highestValid = (\xs -> if not $ null xs then maximum xs else -1) . filter (<= 21)
 
 
 newDeck :: Deck
 newDeck = [Card suit val | suit <- [Spades ..], val <- [Ace ..]]
 
 printHand :: Hand -> IO()
-printHand hand = putStrLn $ (++ ("\nWith a value of " ++ show (valueOfHand hand))) $ intercalate ", " $ map show hand
+printHand hand = putStrLn $ (++ ("\nWith possible values of " ++ intercalate ", " (map show $ valueOfHand hand))) $ intercalate ", " $ map show hand
 
--- in case of two aces, user is stuck with 1 or 11 for both. :/
-valueOfHand :: Hand -> (Int, Int)
-valueOfHand = foldr ((\(a,b) (c,d) -> (a+c, b+d)) . valueOfCard) (0,0)
 
-valueOfCard :: Card -> (Int, Int)
-valueOfCard (Card _ Ace)   = (1, 11)
-valueOfCard (Card _ Jack)  = (10,10)
-valueOfCard (Card _ Queen) = (10,10)
-valueOfCard (Card _ King)  = (10,10)
-valueOfCard Joker          = (0,0)
-valueOfCard (Card _ n)     = (k+1, k+1) where k = fromEnum n
+valueOfHand :: Hand -> [Int]
+valueOfHand hand = map sum $ mapM id listOfCardValues
+    where listOfCardValues = map valueOfCard hand
+
+valueOfCard :: Card -> [Int]
+valueOfCard Joker          = [0]
+valueOfCard (Card _ Ace)   = [1, 11]
+valueOfCard (Card _ n)     = [k] 
+    where k = min (1 + fromEnum n) 10
 
 drawCard :: Deck -> (Card, Deck)
 drawCard [] = error "Game over, Somehow your deck is out of cards."
-drawCard (c:cs) = Just (c, cs)
+drawCard (c:cs) = (c, cs)
 
 shuffleDeck :: MonadRandom m => Deck -> m Deck
 shuffleDeck deck = runRVar (shuffle deck) StdRandom
