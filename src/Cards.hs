@@ -33,7 +33,12 @@ newDeck :: Deck
 newDeck = [Card suit val | suit <- [Spades ..], val <- [Ace ..]]
 
 printHand :: Hand -> IO()
-printHand hand = putStrLn $ (++ ("\nWith possible values of " ++ intercalate ", " (map show $ valueOfHand hand))) $ intercalate ", " $ map show hand
+printHand hand = putStrLn $ showHand hand
+
+showHand :: Hand -> String
+showHand hand = (++ ("\nWith possible values of " ++ intercalate ", "
+                             (map show $ valueOfHand hand))) $ intercalate ", " $ 
+                                map show hand
 
 
 valueOfHand :: Hand -> [Int]
