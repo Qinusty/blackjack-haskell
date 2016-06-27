@@ -17,8 +17,7 @@ playGame :: GameState -> IO ()
 playGame state@(deck, uHand, dHand)
     | null uHand && null dHand = do -- INIT CASE
         putStrLn "You draw:"
-        let 
-            (fCard, nDeck) = drawCard deck
+        let (fCard, nDeck) = drawCard deck
             (sCard, nDeck') = drawCard nDeck
             newUHand = [fCard, sCard]
             (dCard, nDeck'') = drawCard nDeck'
@@ -58,8 +57,7 @@ userTurn state@(deck, uHand, dHand) = do
     where
         performAction (c:cs)
             | c == 'h' = do
-                let 
-                    (card, nDeck) = drawCard deck
+                let (card, nDeck) = drawCard deck
                     newUHand = card : uHand
                 putStr "\nYou drew: "
                 print card
@@ -72,8 +70,7 @@ userTurn state@(deck, uHand, dHand) = do
 dealerTurn :: GameState -> IO GameState
 dealerTurn state@(deck, uHand, dHand) 
     | fst (valueOfHand dHand) <= 16 || snd (valueOfHand dHand) <= 16 = do
-        let 
-            (card, nDeck) = drawCard deck
+        let (card, nDeck) = drawCard deck
             newDHand = card : dHand
         putStr "\nDealer draws: "
         print card
