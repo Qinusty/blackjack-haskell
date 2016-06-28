@@ -33,8 +33,8 @@ playGame state@(deck, uHand, dHand, _)
 
     | otherwise = do -- Main Game
         newState  <- userTurn state
-        state <- dealerTurn newState
-        endGame state
+        endState <- dealerTurn newState
+        endGame endState
 
 endGame :: GameState -> IO ()
 endGame (_, uHand, dHand, _) = do
@@ -56,13 +56,16 @@ userTurn state@(deck, uHand, dHand, _) = do
     choice <- getLine
     performAction choice
     where
-        performAction (c:cs)
+        performAction [] = do
+            putStrLn "Invalid choice"
+            userTurn state
+        performAction (c:_)
             | c == 'h' = do
                 let (card, nDeck) = drawCard deck
                     newUHand = card : uHand
                 putStr "\nYou drew: "
                 print card
-                if (minimum $ valueOfHand newUHand) <= 21 then
+                if minimum  (valueOfHand newUHand) <= 21 then
                     userTurn (nDeck, newUHand, dHand, False)
                 else do
                     putStrLn "BUST!"
