@@ -20,14 +20,15 @@ instance Show Card where
 
 compareHand :: Hand -> Hand -> Ordering
 compareHand hand1 hand2
-    | highestValid values1 >= highestValid values2 = GT
+    | highestValidHandValue values1 >= highestValidHandValue values2 = GT
     | otherwise = LT
     where 
         values1 = valueOfHand hand1
         values2 = valueOfHand hand2
-        highestValid :: [Int] -> Int
-        highestValid = (\xs -> if not $ null xs then maximum xs else -1) . filter (<= 21)
 
+
+highestValidHandValue :: [Int] -> Int
+highestValidHandValue = (\xs -> if not $ null xs then maximum xs else -1) . filter (<= 21)
 
 newDeck :: Deck
 newDeck = [Card suit val | suit <- [Spades ..], val <- [Ace ..]]
@@ -36,7 +37,7 @@ printHand :: Hand -> IO()
 printHand hand = putStrLn $ showHand hand
 
 showHand :: Hand -> String
-showHand hand = (++ ("\nWith possible values of " ++ intercalate ", "
+showHand hand = (++ (" With possible value(s) of " ++ intercalate ", "
                              (map show $ valueOfHand hand))) $ intercalate ", " $ 
                                 map show hand
 
@@ -44,6 +45,10 @@ showHand hand = (++ ("\nWith possible values of " ++ intercalate ", "
 valueOfHand :: Hand -> [Int]
 valueOfHand hand = map sum $ mapM id listOfCardValues
     where listOfCardValues = map valueOfCard hand
+
+isBust :: Hand -> Bool
+isBust hand = lowestVal > 21
+    where lowestVal = minimum $ valueOfHand hand
 
 valueOfCard :: Card -> [Int]
 valueOfCard Joker          = [0]
@@ -54,6 +59,11 @@ valueOfCard (Card _ n)     = [k]
 drawCard :: Deck -> (Card, Deck)
 drawCard [] = error "Game over, Somehow your deck is out of cards."
 drawCard (c:cs) = (c, cs)
+
+drawCards :: Int -> Deck -> ([Card], Deck)
+drawCards _ [] = error "Empty Deck Sorry" 
+drawCards 0 d = ([], d)
+drawCards n (c:cs) = let (cards,deck') = drawCards (n-1) cs in (c:cards, deck') 
 
 shuffleDeck :: MonadRandom m => Deck -> m Deck
 shuffleDeck deck = runRVar (shuffle deck) StdRandom
