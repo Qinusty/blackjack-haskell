@@ -9,5 +9,5 @@ Run the application with `./Game`
 ## Dependencies
 ```
 sudo dnf install Haskell-Platform
-Cabal install random-extras-0.19
+cabal install random-extras-0.19
 ```
