@@ -33,10 +33,12 @@ server :: String
 server = "chat.freenode.net"
 port :: Int
 port = 6667
-chan :: String
-chan = "#blackjack-hs"
 nick :: String
 nick = "blackjack-hs-bot"
+
+welcomeMsg = ["Welcome to my Blackjack IRC bot written in Haskell."
+             ,"You can find the source code here https://github.com/Qinusty/blackjack-haskell/"
+             ,"Feel free to open issues or make pull requests."]
 
 commands :: [(String, String)]
 commands = [
@@ -207,7 +209,8 @@ handleCommand h state@(MPGameState deck ps) msg@(Message sender typ target messa
     else do
         let newPs = M.insert sender (newPlayer sender) ps
         -- Sorry for cheap hack
-        sendMsg h sender "You have been added to the player list, feel free to check the commands by sending 'help'"
+        mapM_ (sendMsg h sender) welcomeMsg
+        sendMsg h sender "You have been added to the player list, feel free to check available commands by using the 'help' command"
         return (MPGameState deck newPs)
 
     where messageWords = words $ map (toLower) message
