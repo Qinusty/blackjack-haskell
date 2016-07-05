@@ -124,19 +124,22 @@ handleCommand h state@(MPGameState deck ps) msg@(Message sender typ target messa
                                     (newDCard, deck'') = drawCard deck'
                                     player'            = addToDealerHand [newDCard] $ addToPlayerHand newPCards $ makeBet val justPlayer
                                     ps'                = M.insert sender player' ps
-
-                                if withinBetBounds val then do
-                                    if val <= (balance justPlayer) then do
-                                        sendMsg h sender ("You're in with a bet of " ++ show val)
-                                        sendMsg h sender $ "You draw " ++ showHand newPCards
-                                        sendMsg h sender $ "Dealer draws " ++ showHand [newDCard]
-                                        sendMsg h sender   "Use commands 'hit' or 'stay' to hit or stay respectively"
-                                        return (MPGameState deck'' ps')
+                                if args /= [] then
+                                    if withinBetBounds val then do
+                                        if val <= (balance justPlayer) then do
+                                            sendMsg h sender ("You're in with a bet of " ++ show val)
+                                            sendMsg h sender $ "You draw " ++ showHand newPCards
+                                            sendMsg h sender $ "Dealer draws " ++ showHand [newDCard]
+                                            sendMsg h sender   "Use commands 'hit' or 'stay' to hit or stay respectively"
+                                            return (MPGameState deck'' ps')
+                                        else do
+                                            sendMsg h sender $ "You cannot afford this bet! Your balance is " ++ show (balance justPlayer)
+                                            return state
                                     else do
-                                        sendMsg h sender $ "You cannot afford this bet! Your balance is " ++ show (balance justPlayer)
+                                        sendMsg h sender  $ "This is not within the betting bounds! (" ++ show minBet ++ "-" ++ show maxBet ++ ")." 
                                         return state
-                                else do
-                                    sendMsg h sender  $ "This is not within the betting bounds! (" ++ show minBet ++ "-" ++ show maxBet ++ ")." 
+                                else do 
+                                    sendMsg h sender "You need to provide a value for your bet. bet <Value>"
                                     return state
                             otherwise -> do
                                 sendMsg h sender "You're already playing a hand, use the 'hit' command to get another card."
