@@ -4,11 +4,17 @@ import Network
 import System.IO
 import Text.Printf
 import Data.Char
+import Data.List (intercalate)
 import Control.Lens
 import Data.Maybe
 import qualified Data.Map.Strict as M
 import Utils
 import Cards
+import FloodGate as FG
+
+import Control.Monad.STM
+import Control.Concurrent
+import Control.Concurrent.STM.TChan
 -- | 
 data PlayerInfo = PlayerInfo {balance :: Int, pHand :: Hand
                              ,dHand :: Hand, playerState :: PlayerState} deriving (Eq)
@@ -63,17 +69,19 @@ startingBalance :: Int
 startingBalance = 5000
 
 currency :: Char
-currency = 'λ'
+currency = '£'
 
 main :: IO()
 main = do
-    h <- connectTo server (PortNumber (fromIntegral port))
+    h    <- connectTo server (PortNumber (fromIntegral port))
+    chan <- atomically $ newTChan
     hSetBuffering h NoBuffering
     write h "NICK" nick
     write h "USER" (nick++" 0 * :Haskell IRC Bot")
     --write h "JOIN" chan
     deck <- shuffleDeck newDeck
-    listen h (MPGameState deck (M.empty)) -- Init the MPGameState
+    forkIO $ FG.runThread chan
+    listen h chan (MPGameState deck (M.empty)) -- Init the MPGameState
 
 
 write :: Handle -> String -> String -> IO ()
@@ -81,39 +89,39 @@ write h s t = do
     hPrintf h "%s %s\r\n" s t
     printf    "> %s %s\n" s t
 
-listen :: Handle -> MPGameState -> IO ()
-listen h state@(MPGameState deck ps)
+listen :: Handle -> TChan (IO ()) -> MPGameState -> IO ()
+listen h chan state@(MPGameState deck ps)
     | length deck < 26 = do 
         aNewDeck <- shuffleDeck newDeck
-        listen h (MPGameState (deck ++ aNewDeck) ps) 
+        listen h chan (MPGameState (deck ++ aNewDeck) ps) 
     | otherwise = do
         s <- hGetLine h
         let parsedMessage = parseMessage s
-        print parsedMessage -- debug
-        newState <- handleMessage h state $ parseMessage s
+        --print parsedMessage -- debug
+        newState <- handleMessage h chan state $ parseMessage s
         
-        listen h newState
+        listen h chan newState
 
 newPlayer :: String -> PlayerInfo
 newPlayer uName = PlayerInfo startingBalance [] [] WAITING
 
-handleMessage :: Handle -> MPGameState -> IRCMessage -> IO MPGameState 
-handleMessage h state (PING serv) = do 
+handleMessage :: Handle -> TChan (IO ()) -> MPGameState -> IRCMessage -> IO MPGameState 
+handleMessage h _ state (PING serv) = do -- responds to a ping with PONG
             write h "PONG" serv
             return state
-handleMessage h state msg@(Message sender typ target message) = 
+handleMessage h chan state msg@(Message sender typ target message) = 
             if typ == "PRIVMSG" && userNick /= nick then
-                handleCommand h state (Message userNick typ target message)
+                handleCommand h chan state (Message userNick typ target message)
             else
                 return state
     where userNick = parseUserNick sender
 
-handleCommand :: Handle -> MPGameState -> IRCMessage -> IO MPGameState
-handleCommand h state@(MPGameState deck ps) msg@(Message sender typ target message) = do 
+handleCommand :: Handle -> TChan (IO ()) -> MPGameState -> IRCMessage -> IO MPGameState
+handleCommand h chan state@(MPGameState deck ps) msg@(Message sender typ target message) = do 
     if player /= Nothing then
         case command of
             ":help" -> do 
-                        mapM_ (sendMsg h sender) helpList
+                        mapM_ (sendMsg h chan sender) helpList
                         return state
             ":bet"  -> do 
                         case playerState (fromJust player) of
@@ -127,22 +135,22 @@ handleCommand h state@(MPGameState deck ps) msg@(Message sender typ target messa
                                 if args /= [] then
                                     if withinBetBounds val then do
                                         if val <= (balance justPlayer) then do
-                                            sendMsg h sender ("You're in with a bet of " ++ show val)
-                                            sendMsg h sender $ "You draw " ++ showHand newPCards
-                                            sendMsg h sender $ "Dealer draws " ++ showHand [newDCard]
-                                            sendMsg h sender   "Use commands 'hit' or 'stay' to hit or stay respectively"
+                                            sendMsg h chan sender ("You're in with a bet of " ++ show val)
+                                            sendMsg h chan sender $ "You draw " ++ showHand newPCards
+                                            sendMsg h chan sender $ "Dealer draws " ++ showHand [newDCard]
+                                            sendMsg h chan sender   "Use commands 'hit' or 'stay' to hit or stay respectively"
                                             return (MPGameState deck'' ps')
                                         else do
-                                            sendMsg h sender $ "You cannot afford this bet! Your balance is " ++ show (balance justPlayer)
+                                            sendMsg h chan sender $ "You cannot afford this bet! Your balance is " ++ show (balance justPlayer)
                                             return state
                                     else do
-                                        sendMsg h sender  $ "This is not within the betting bounds! (" ++ show minBet ++ "-" ++ show maxBet ++ ")." 
+                                        sendMsg h chan sender  $ "This is not within the betting bounds! (" ++ show minBet ++ "-" ++ show maxBet ++ ")." 
                                         return state
                                 else do 
-                                    sendMsg h sender "You need to provide a value for your bet. bet <Value>"
+                                    sendMsg h chan sender "You need to provide a value for your bet. bet <Value>"
                                     return state
                             otherwise -> do
-                                sendMsg h sender "You're already playing a hand, use the 'hit' command to get another card."
+                                sendMsg h chan sender "You're already playing a hand, use the 'hit' command to get another card."
                                 return state
             ":hit"  -> do
                         case playerState (fromJust player) of
@@ -157,27 +165,27 @@ handleCommand h state@(MPGameState deck ps) msg@(Message sender typ target messa
                                                     else 
                                                         M.insert sender player' ps
 
-                                sendMsg h sender $ "You draw: " ++ show card'
+                                sendMsg h chan sender $ "You draw: " ++ show card'
                                 if bust then do
-                                    sendMsg h sender $ "Your new minimum hand value is " ++ show minHandVal
-                                    sendMsg h sender   "You have gone bust! You are now removed from this hand."
-                                    sendMsg h sender   "To join back use the 'bet <Value>' command!"
+                                    sendMsg h chan sender $ "Your new minimum hand value is " ++ show minHandVal
+                                    sendMsg h chan sender   "You have gone bust! You are now removed from this hand."
+                                    sendMsg h chan sender   "To join back use the 'bet <Value>' command!"
                                 else do
-                                    sendMsg h sender $ "Your new hand is: " ++ showHand (pHand player')
-                                    sendMsg h sender   "Use commands 'hit' or 'stay' to hit or stay respectively"
+                                    sendMsg h chan sender $ "Your new hand is: " ++ showHand (pHand player')
+                                    sendMsg h chan sender   "Use commands 'hit' or 'stay' to hit or stay respectively"
                                 return (MPGameState deck' ps')
                             otherwise -> do 
-                                sendMsg h sender "You can't hit because you haven't placed a bet for this hand! Use command 'bet <Value> to place a bet."
+                                sendMsg h chan sender "You can't hit because you haven't placed a bet for this hand! Use command 'bet <Value> to place a bet."
                                 return state
             ":balance" -> do 
-                        sendMsg h sender $ "Your balance is: " ++ show (balance (fromJust player))
+                        sendMsg h chan sender $ "Your balance is: " ++ (currency : show (balance (fromJust player)))
                         return state
             ":hand" -> case playerState (fromJust player) of
                             PLAYING _ -> do
-                                sendMsg h sender $ "Your current hand is: " ++ showHand (pHand (fromJust player))
+                                sendMsg h chan sender $ "Your current hand is: " ++ showHand (pHand (fromJust player))
                                 return state
                             otherwise -> do
-                                sendMsg h sender "You're not currently playing a hand, use command 'bet <Value>' to begin."
+                                sendMsg h chan sender "You're not currently playing a hand, use command 'bet <Value>' to begin."
                                 return state
             ":stay" -> case playerState (fromJust player) of
                             PLAYING bet -> do
@@ -191,29 +199,32 @@ handleCommand h state@(MPGameState deck ps) msg@(Message sender typ target messa
                                                 endHand justPlayer
                                     ps' = M.insert sender player' ps
 
-                                sendMsg h sender   "Final Hands:"
-                                sendMsg h sender $ "Your hand: "   ++ showHand playerHand
-                                sendMsg h sender $ "Dealer hand: " ++ showHand dealerHand
+                                sendMsg h chan sender   "Final Hands:"
+                                sendMsg h chan sender $ "Your hand: "   ++ showHand playerHand
+                                sendMsg h chan sender $ "Dealer hand: " ++ showHand dealerHand
                                 if won then do
-                                    sendMsg h sender $ "You won! You receive " ++ show (bet*2) ++ 
-                                                        " and your new balance is " ++ show (balance (player'))
+                                    sendMsg h chan sender $ "You won! You receive " ++ show (bet*2) ++ 
+                                                        " and your new balance is " ++ (currency : show (balance (player')))
                                 else do
-                                    sendMsg h sender "You lose!"
-                                    sendMsg h sender "To play another hand use the 'bet <Value>' command!"
+                                    sendMsg h chan sender "You lose!"
+                                    sendMsg h chan sender "To play another hand use the 'bet <Value>' command!"
                                 return (MPGameState deck' ps')
 
                             otherwise -> do
-                                sendMsg h sender "You're not currently playing a hand, use command 'bet <Value>' to begin."
+                                sendMsg h chan sender "You're not currently playing a hand, use command 'bet <Value>' to begin."
                                 return state
+            ":players" -> do 
+                    sendMsg h chan sender $ "List of players: " ++ (intercalate ", " $ M.keys ps)
+                    return state
             otherwise -> do
-                sendMsg h sender "That isn't a valid command! Use the 'help' command to see valid commands."
+                sendMsg h chan sender "That isn't a valid command! Use the 'help' command to see valid commands."
                 return state
 
     else do
         let newPs = M.insert sender (newPlayer sender) ps
         -- Sorry for cheap hack
-        mapM_ (sendMsg h sender) welcomeMsg
-        sendMsg h sender "You have been added to the player list, feel free to check available commands by using the 'help' command"
+        mapM_ (sendMsg h chan sender) welcomeMsg
+        sendMsg h chan sender "You have been added to the player list, feel free to check available commands by using the 'help' command"
         return (MPGameState deck newPs)
 
     where messageWords = words $ map (toLower) message
@@ -257,8 +268,8 @@ parseMessage s = if startsWith "PING :" s then
                         message   = unwords $ drop 3 parts
                     in Message sender typ target message
 
-sendMsg :: Handle -> String -> String -> IO ()
-sendMsg h target msg = write h "PRIVMSG" (target ++ (' ' : ':' : msg) ++ "\r\n")
+sendMsg :: Handle -> TChan (IO ()) -> String -> String -> IO ()
+sendMsg h chan target msg = atomically $ writeTChan chan $ write h "PRIVMSG" (target ++ (' ' : ':' : msg) ++ "\r\n")
 
 parseUserNick :: String -> String
 parseUserNick s = takeWhile (\c -> c /= '!') $ tail s

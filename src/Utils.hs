@@ -7,3 +7,6 @@ startsWith [] _ = False
 startsWith _ [] = False
 startsWith (c:[]) (c':_) = c == c'
 startsWith (c:cs) (c':cs') = c == c' && startsWith cs cs'
+
+forever :: IO a -> IO a
+forever a = do _ <- a; forever a
