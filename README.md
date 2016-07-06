@@ -1,10 +1,7 @@
-# Blackjack Game
+[![Travis-Ci](https://travis-ci.org/Qinusty/blackjack-haskell.svg)](https://travis-ci.org/Qinusty/blackjack-haskell)
+
+# Blackjack IRC Bot
 This is my basic blackjack game written in Haskell. It runs in a terminal window and allows the user to play against a dealer who follows a set of rules on whether to draw a card or fold. The user can decide whether or not to fold throughout the game.
-
-## Running the game
-Compile the Application with `ghc Game.hs --make`
-
-Run the application with `./Game`
 
 ## The IRC Bot
 
@@ -29,8 +26,14 @@ ghc Bot.hs
 ```
 **Ensure that you have given your bot an appropriate name within the Bot.hs source file**
 
+
+## Running the terminal game
+Compile the Application with `ghc Game.hs --make`
+
+Run the application with `./Game`
+
 ## Dependencies
 ```
 sudo dnf install Haskell-Platform
-cabal install random-extras-0.19
+cabal install --only-dependencies
 ```
