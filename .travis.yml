@@ -9,8 +9,3 @@ cache:
 
 ghc: 7.8
 
-before_install:
-  - sudo apt-get install Haskell-Platform
-
-install: 
-- cabal install random-extras-0.19 
