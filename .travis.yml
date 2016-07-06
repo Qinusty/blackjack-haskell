@@ -1,0 +1,11 @@
+sudo: true
+
+language: Haskell
+
+cache:
+  directories:
+    - $HOME/.ghc
+    - $HOME/.cabal
+
+ghc: 7.8
+
