@@ -1,1 +1,6 @@
+language: Haskell
+
 ghc: 7.8
+
+install: 
+- cabal install random-extras-0.19 
